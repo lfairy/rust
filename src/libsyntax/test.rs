@@ -59,6 +59,7 @@ struct TestCtxt<'a> {
     reexport_test_harness_main: Option<InternedString>,
     is_test_crate: bool,
     config: ast::CrateConfig,
+    in_nested_fn: bool,
 
     // top-level re-export submodule, filled out after folding is finished
     toplevel_reexport: Option<ast::Ident>,
@@ -146,12 +147,17 @@ impl<'a> fold::Folder for TestHarnessGenerator<'a> {
             }
         }
 
-        // We don't want to recurse into anything other than mods, since
-        // mods or tests inside of functions will break things
-        let res = match i.node {
-            ast::ItemMod(..) => fold::noop_fold_item(i, self),
-            _ => SmallVector::one(i),
-        };
+        let res;
+        match i.node {
+            ast::ItemMod(..) => res = fold::noop_fold_item(i, self),
+            _ => {
+                // Set `in_nested_fn = true` while exploring this branch
+                let old_value = self.cx.in_nested_fn;
+                self.cx.in_nested_fn = true;
+                res = fold::noop_fold_item(i, self);
+                self.cx.in_nested_fn = old_value;
+            },
+        }
         if ident.name != token::special_idents::invalid.name {
             self.cx.path.pop();
         }
@@ -251,6 +257,7 @@ fn generate_test_harness(sess: &ParseSess,
         reexport_test_harness_main: reexport_test_harness_main,
         is_test_crate: is_test_crate(&krate),
         config: krate.config.clone(),
+        in_nested_fn: false,
         toplevel_reexport: None,
     };
 
@@ -318,14 +325,16 @@ fn is_test_fn(cx: &TestCtxt, i: &ast::Item) -> bool {
     if has_test_attr {
         let diag = cx.span_diagnostic;
         match has_test_signature(i) {
-            Yes => {},
+            Yes => if cx.in_nested_fn {
+                diag.span_err(i.span, "only top level functions may be used as tests")
+            },
             No => diag.span_err(i.span, "functions used as tests must have signature fn() -> ()"),
             NotEvenAFunction => diag.span_err(i.span,
                                               "only functions may be used as tests"),
         }
     }
 
-    return has_test_attr && has_test_signature(i) == Yes;
+    return has_test_attr && !cx.in_nested_fn && has_test_signature(i) == Yes;
 }
 
 fn is_bench_fn(cx: &TestCtxt, i: &ast::Item) -> bool {
