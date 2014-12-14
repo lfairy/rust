@@ -361,13 +361,17 @@ fn is_bench_fn(cx: &TestCtxt, i: &ast::Item) -> bool {
         }
     }
 
-    if has_bench_attr && !has_test_signature(i) {
+    if has_bench_attr {
         let diag = cx.span_diagnostic;
-        diag.span_err(i.span, "functions used as benches must have signature \
-                      `fn(&mut Bencher) -> ()`");
+        if cx.in_nested_fn {
+            diag.span_err(i.span, "only top level functions may be used as benches");
+        } else if !has_test_signature(i) {
+            diag.span_err(i.span, "functions used as benches must have signature \
+                          `fn(&mut Bencher) -> ()`");
+        }
     }
 
-    return has_bench_attr && has_test_signature(i);
+    return has_bench_attr && !cx.in_nested_fn && has_test_signature(i);
 }
 
 fn is_ignored(i: &ast::Item) -> bool {
