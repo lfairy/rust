@@ -280,6 +280,15 @@ pub trait String {
 pub trait Display {
     /// Formats the value using the given formatter.
     fn fmt(&self, &mut Formatter) -> Result;
+
+    /// Converts the value efficiently to a string slice, if possible. Most
+    /// types should not need to override this method.
+    ///
+    /// This method is used in the implementation of `ToString::to_string()`.
+    /// On `Some`, `.to_string()` will copy the value directly instead of
+    /// taking a detour through `.fmt()`.
+    #[inline]
+    fn fmt_as_str(&self) -> Option<&str> { None }
 }
 
 impl<T: String + ?Sized> Display for T {
@@ -682,7 +691,20 @@ macro_rules! fmt_refs {
     }
 }
 
-fmt_refs! { Debug, Display, Octal, Binary, LowerHex, UpperHex, LowerExp, UpperExp }
+fmt_refs! { Debug, Octal, Binary, LowerHex, UpperHex, LowerExp, UpperExp }
+
+// Implement Display separately, as it has an extra fmt_as_str() method
+impl<'a, T: ?Sized + Display> Display for &'a T {
+    fn fmt(&self, f: &mut Formatter) -> Result { Display::fmt(&**self, f) }
+    #[inline]
+    fn fmt_as_str(&self) -> Option<&str> { Display::fmt_as_str(&**self) }
+}
+
+impl<'a, T: ?Sized + Display> Display for &'a mut T {
+    fn fmt(&self, f: &mut Formatter) -> Result { Display::fmt(&**self, f) }
+    #[inline]
+    fn fmt_as_str(&self) -> Option<&str> { Display::fmt_as_str(&**self) }
+}
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl Debug for bool {
@@ -713,6 +735,11 @@ impl Debug for str {
 impl Display for str {
     fn fmt(&self, f: &mut Formatter) -> Result {
         f.pad(self)
+    }
+
+    #[inline]
+    fn fmt_as_str(&self) -> Option<&str> {
+        Some(self)
     }
 }
 

@@ -823,6 +823,11 @@ impl fmt::Display for String {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }
+
+    #[inline]
+    fn fmt_as_str(&self) -> Option<&str> {
+        Some(self.as_slice())
+    }
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -946,11 +951,17 @@ pub trait ToString {
 impl<T: fmt::Display + ?Sized> ToString for T {
     #[inline]
     fn to_string(&self) -> String {
+        use core::borrow::ToOwned;
         use core::fmt::Writer;
-        let mut buf = String::new();
-        let _ = buf.write_fmt(format_args!("{}", self));
-        buf.shrink_to_fit();
-        buf
+        match self.fmt_as_str() {
+            Some(s) => s.to_owned(),
+            None => {
+                let mut buf = String::new();
+                let _ = buf.write_fmt(format_args!("{}", self));
+                buf.shrink_to_fit();
+                buf
+            }
+        }
     }
 }
 
