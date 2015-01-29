@@ -262,4 +262,11 @@ impl<'a, T, B: ?Sized> fmt::Display for Cow<'a, T, B> where
             Owned(ref o) => fmt::Display::fmt(o, f),
         }
     }
+
+    fn fmt_as_str(&self) -> Option<&str> {
+        match *self {
+            Borrowed(ref b) => fmt::Display::fmt_as_str(b),
+            Owned(ref o) => fmt::Display::fmt_as_str(o),
+        }
+    }
 }
