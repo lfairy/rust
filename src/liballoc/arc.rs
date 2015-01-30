@@ -587,6 +587,10 @@ impl<T: fmt::Display> fmt::Display for Arc<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }
+
+    fn fmt_as_str(&self) -> Option<&str> {
+        fmt::Display::fmt_as_str(&**self)
+    }
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
