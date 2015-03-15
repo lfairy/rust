@@ -10,6 +10,6 @@ all:
 	cp foo.rs $(TMPDIR)/+foo+bar
 	$(RUSTC) $(TMPDIR)/+foo+bar 2>&1 \
 		| grep "invalid character.*in crate name:"
-	cp foo.rs $(TMPDIR)/-foo.rs
-	$(RUSTC) $(TMPDIR)/-foo.rs 2>&1 \
-		| grep "crate name cannot start with a hyphen:"
+	cp foo.rs $(TMPDIR)/foo-bar.rs
+	$(RUSTC) $(TMPDIR)/foo-bar.rs 2>&1 \
+		| grep "invalid character.*in crate name:"

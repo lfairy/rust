@@ -80,20 +80,24 @@ pub fn validate_crate_name(sess: Option<&Session>, s: &str, sp: Option<Span>) {
             (None, Some(sess)) => sess.err(s),
         }
     };
-    if s.len() == 0 {
+    if s.is_empty() {
         err("crate name must not be empty");
-    } else if s.char_at(0) == '-' {
-        err(&format!("crate name cannot start with a hyphen: {}", s));
     }
-    for c in s.chars() {
-        if c.is_alphanumeric() { continue }
-        if c == '_' || c == '-' { continue }
+    let bad_char = s.chars().enumerate().find(|&(i, c)| !is_valid_crate_char(i, c));
+    if let Some((_, c)) = bad_char {
         err(&format!("invalid character `{}` in crate name: `{}`", c, s));
     }
     match sess {
         Some(sess) => sess.abort_if_errors(),
         None => {}
     }
+}
+
+fn is_valid_crate_char(i: usize, c: char) -> bool {
+    c == '_' ||
+        ('A' <= c && c <= 'Z') ||
+        ('a' <= c && c <= 'z') ||
+        (i > 0 && '0' <= c && c <= '9')
 }
 
 
