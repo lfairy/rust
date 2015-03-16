@@ -1157,12 +1157,8 @@ impl<'l, 'tcx, 'v> Visitor<'v> for DxrVisitor<'l, 'tcx> {
                 }
             }
             ast::ItemExternCrate(ref s) => {
-                let name = get_ident(item.ident);
-                let name = &name;
-                let location = match *s {
-                    Some((ref s, _)) => s.to_string(),
-                    None => name.to_string(),
-                };
+                let name = item.ident.name;
+                let location = s.unwrap_or(name);
                 let alias_span = self.span.span_for_last_ident(item.span);
                 let cnum = match self.sess.cstore.find_extern_mod_stmt_cnum(item.id) {
                     Some(cnum) => cnum,
@@ -1172,8 +1168,8 @@ impl<'l, 'tcx, 'v> Visitor<'v> for DxrVisitor<'l, 'tcx> {
                                           alias_span,
                                           item.id,
                                           cnum,
-                                          name,
-                                          &location[..],
+                                          name.as_str(),
+                                          location.as_str(),
                                           self.cur_scope);
             }
             ast::ItemFn(ref decl, _, _, ref ty_params, ref body) =>

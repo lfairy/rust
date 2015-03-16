@@ -813,8 +813,8 @@ impl<'a> State<'a> {
             ast::ItemExternCrate(ref optional_path) => {
                 try!(self.head(&visibility_qualified(item.vis,
                                                      "extern crate")));
-                if let Some((ref p, style)) = *optional_path {
-                    try!(self.print_string(p, style));
+                if let Some(p) = *optional_path {
+                    try!(self.print_name(p));
                     try!(space(&mut self.s));
                     try!(word(&mut self.s, "as"));
                     try!(space(&mut self.s));

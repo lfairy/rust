@@ -1769,10 +1769,9 @@ pub struct Item {
 
 #[derive(Clone, PartialEq, Eq, RustcEncodable, RustcDecodable, Hash, Debug)]
 pub enum Item_ {
-    /// An`extern crate` item, with optional original crate name,
-    ///
-    /// e.g. `extern crate foo` or `extern crate "foo-bar" as foo`
-    ItemExternCrate(Option<(InternedString, StrStyle)>),
+    /// An `extern crate` item with optional original crate name,
+    /// e.g. `extern crate foo` or `extern crate foo_bar as foo`
+    ItemExternCrate(Option<Name>),
     /// A `use` or `pub use` item
     ItemUse(P<ViewPath>),
 
@@ -1792,17 +1791,15 @@ pub enum Item_ {
     ItemEnum(EnumDef, Generics),
     /// A struct definition, e.g. `struct Foo<A> {x: A}`
     ItemStruct(P<StructDef>, Generics),
-    /// Represents a Trait Declaration
+    /// A trait declaration
     ItemTrait(Unsafety,
               Generics,
               TyParamBounds,
               Vec<P<TraitItem>>),
 
-    // Default trait implementations
-    ///
-    // `impl Trait for .. {}`
+    /// Default trait implementations, e.g. `impl Trait for .. {}`
     ItemDefaultImpl(Unsafety, TraitRef),
-    /// An implementation, eg `impl<A> Trait for Foo { .. }`
+    /// An implementation of a trait, eg `impl<A> Trait for Foo { .. }`
     ItemImpl(Unsafety,
              ImplPolarity,
              Generics,

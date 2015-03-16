@@ -5221,46 +5221,44 @@ impl<'a> Parser<'a> {
     ///
     /// # Examples
     ///
+    /// ```rust,ignore
     /// extern crate url;
-    /// extern crate foo = "bar"; //deprecated
-    /// extern crate "bar" as foo;
+    /// extern crate bar as foo;
+    /// extern crate "bar" as foo; // deprecated
+    /// ```
     fn parse_item_extern_crate(&mut self,
                                 lo: BytePos,
                                 visibility: Visibility,
                                 attrs: Vec<Attribute>)
                                 -> P<Item> {
 
-        let span = self.span;
-        let (maybe_path, ident) = match self.token {
+        let maybe_path;
+        let ident;
+        match self.token {
             token::Ident(..) => {
-                let the_ident = self.parse_ident();
-                let path = if self.eat_keyword_noexpect(keywords::As) {
-                    // skip the ident if there is one
-                    if self.token.is_ident() { self.bump(); }
-
-                    self.span_err(span, "expected `;`, found `as`");
-                    self.fileline_help(span,
-                                   &format!("perhaps you meant to enclose the crate name `{}` in \
-                                           a string?",
-                                          the_ident.as_str()));
-                    None
+                let ident_or_path = self.parse_ident();
+                if self.eat_keyword(keywords::As) {
+                    ident = self.parse_ident();
+                    maybe_path = Some(ident_or_path.name);
                 } else {
-                    None
-                };
+                    ident = ident_or_path;
+                    maybe_path = None;
+                }
                 self.expect(&token::Semi);
-                (path, the_ident)
             },
-            token::Literal(token::Str_(..), suf) | token::Literal(token::StrRaw(..), suf) => {
+            token::Literal(token::Str_(s), suf) | token::Literal(token::StrRaw(s, _), suf) => {
+                self.bump();
                 let sp = self.span;
                 self.expect_no_suffix(sp, "extern crate name", suf);
-                // forgo the internal suffix check of `parse_str` to
-                // avoid repeats (this unwrap will always succeed due
-                // to the restriction of the `match`)
-                let (s, style, _) = self.parse_optional_str().unwrap();
                 self.expect_keyword(keywords::As);
-                let the_ident = self.parse_ident();
+                ident = self.parse_ident();
+                maybe_path = {
+                    // Replace all hyphens with underscores
+                    let path: String = s.as_str().chars()
+                        .map(|c| if c == '-' { '_' } else { c }).collect();
+                    Some(token::intern(&path))
+                };
                 self.expect(&token::Semi);
-                (Some((s, style)), the_ident)
             },
             _ => {
                 let span = self.span;

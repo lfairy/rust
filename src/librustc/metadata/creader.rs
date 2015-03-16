@@ -188,9 +188,9 @@ impl<'a> CrateReader<'a> {
                 debug!("resolving extern crate stmt. ident: {} path_opt: {:?}",
                        ident, path_opt);
                 let name = match *path_opt {
-                    Some((ref path_str, _)) => {
-                        let name = path_str.to_string();
-                        validate_crate_name(Some(self.sess), &name[..],
+                    Some(path) => {
+                        let name = path.to_string();
+                        validate_crate_name(Some(self.sess), &name,
                                             Some(i.span));
                         name
                     }
