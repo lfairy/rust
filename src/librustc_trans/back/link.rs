@@ -157,13 +157,28 @@ pub fn find_crate_name(sess: Option<&Session>,
     if let Some((attr, s)) = attr_crate_name {
         return validate(s.to_string(), Some(attr.span));
     }
-    if let Input::File(ref path) = *input {
-        if let Some(s) = path.file_stem().and_then(|s| s.to_str()) {
-            return validate(s.to_string(), None);
+
+    // Sometimes, we'd get a filename that doesn't lead to a valid crate name
+    // (e.g. `foo-bar.rs`). Usually this would cause an error, but when we're
+    // building an *executable* the crate name shouldn't matter. So in this case
+    // we can always use a dummy crate name instead.
+    if !is_executable_crate_only(sess) {
+        if let Input::File(ref path) = *input {
+            if let Some(s) = path.file_stem().and_then(|s| s.to_str()) {
+                return validate(s.to_string(), None);
+            }
         }
     }
 
-    "rust-out".to_string()
+    "rust_out".to_string()
+}
+
+fn is_executable_crate_only(sess: Option<&Session>) -> bool {
+    match sess {
+        None => false,
+        Some(sess) => sess.opts.crate_types.iter()
+            .all(|t| *t == config::CrateTypeExecutable)
+    }
 }
 
 pub fn build_link_meta(sess: &Session, krate: &ast::Crate,
