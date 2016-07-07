@@ -368,7 +368,7 @@ impl Integer {
     /// signed discriminant range and #[repr] attribute.
     /// N.B.: u64 values above i64::MAX will be treated as signed, but
     /// that shouldn't affect anything, other than maybe debuginfo.
-    pub fn repr_discr(tcx: TyCtxt, hint: attr::ReprAttr, min: i64, max: i64)
+    pub fn repr_discr(tcx: TyCtxt, hints: &[attr::ReprAttr], min: i64, max: i64)
                       -> (Integer, bool) {
         // Theoretically, negative values could be larger in unsigned representation
         // than the unsigned representation of the signed minimum. However, if there
@@ -377,33 +377,36 @@ impl Integer {
         let unsigned_fit = Integer::fit_unsigned(cmp::max(min as u64, max as u64));
         let signed_fit = cmp::max(Integer::fit_signed(min), Integer::fit_signed(max));
 
-        let at_least = match hint {
-            attr::ReprInt(span, ity) => {
-                let discr = Integer::from_attr(&tcx.data_layout, ity);
-                let fit = if ity.is_signed() { signed_fit } else { unsigned_fit };
-                if discr < fit {
-                    span_bug!(span, "representation hint insufficient for discriminant range")
+        let mut at_least = I8;
+        for hint in hints {
+            match hint {
+                attr::ReprInt(span, ity) => {
+                    let discr = Integer::from_attr(&tcx.data_layout, ity);
+                    let fit = if ity.is_signed() { signed_fit } else { unsigned_fit };
+                    if discr < fit {
+                        span_bug!(span, "representation hint insufficient for discriminant range")
+                    }
+                    return (discr, ity.is_signed());
                 }
-                return (discr, ity.is_signed());
-            }
-            attr::ReprExtern => {
-                match &tcx.sess.target.target.arch[..] {
-                    // WARNING: the ARM EABI has two variants; the one corresponding
-                    // to `at_least == I32` appears to be used on Linux and NetBSD,
-                    // but some systems may use the variant corresponding to no
-                    // lower bound.  However, we don't run on those yet...?
-                    "arm" => I32,
-                    _ => I32,
+                attr::ReprExtern => {
+                    at_least = match &tcx.sess.target.target.arch[..] {
+                        // WARNING: the ARM EABI has two variants; the one corresponding
+                        // to `at_least == I32` appears to be used on Linux and NetBSD,
+                        // but some systems may use the variant corresponding to no
+                        // lower bound.  However, we don't run on those yet...?
+                        "arm" => I32,
+                        _ => I32,
+                    }
+                }
+                attr::ReprAny => { }
+                attr::ReprPacked => {
+                    bug!("Integer::repr_discr: found #[repr(packed)] on an enum");
+                }
+                attr::ReprSimd => {
+                    bug!("Integer::repr_discr: found #[repr(simd)] on an enum");
                 }
             }
-            attr::ReprAny => I8,
-            attr::ReprPacked => {
-                bug!("Integer::repr_discr: found #[repr(packed)] on an enum");
-            }
-            attr::ReprSimd => {
-                bug!("Integer::repr_discr: found #[repr(simd)] on an enum");
-            }
-        };
+        }
 
         // If there are no negative values, we can use the unsigned fit.
         if min >= 0 {
@@ -899,8 +902,7 @@ impl<'a, 'gcx, 'tcx> Layout {
                 }
             }
             ty::TyEnum(def, substs) => {
-                let hint = *tcx.lookup_repr_hints(def.did).get(0)
-                    .unwrap_or(&attr::ReprAny);
+                let hints = &tcx.lookup_repr_hints(def.did)[..];
 
                 let dtor = def.dtor_kind().has_drop_flag();
                 let drop_flag = if dtor {
@@ -912,7 +914,7 @@ impl<'a, 'gcx, 'tcx> Layout {
                 if def.variants.is_empty() {
                     // Uninhabitable; represent as unit
                     // (Typechecking will reject discriminant-sizing attrs.)
-                    assert_eq!(hint, attr::ReprAny);
+                    assert_eq!(hints, &[attr::ReprAny]);
 
                     let mut st = Struct::new(dl, false);
                     st.extend(dl, drop_flag.iter().map(Ok), ty)?;
@@ -928,7 +930,7 @@ impl<'a, 'gcx, 'tcx> Layout {
                         if x > max { max = x; }
                     }
 
-                    let (discr, signed) = Integer::repr_discr(tcx, hint, min, max);
+                    let (discr, signed) = Integer::repr_discr(tcx, hints, min, max);
                     return Ok(CEnum {
                         discr: discr,
                         signed: signed,
